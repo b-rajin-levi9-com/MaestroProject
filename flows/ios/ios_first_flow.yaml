@@ -2,6 +2,7 @@ appId: com.example.apple-samplecode.UICatalog
 
 ---
 # Pokreni aplikaciju
+- clearState
 - launchApp
 
 # Wait for app to fully load

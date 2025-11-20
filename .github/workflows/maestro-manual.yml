@@ -29,7 +29,7 @@ jobs:
 
       - name: Boot iOS Simulator
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 18.1" -A 20 | grep "iPhone 16 " | grep -v "Pro" | grep -v "Plus" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           echo "Booting simulator: $DEVICE_ID"
           xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
           xcrun simctl bootstatus $DEVICE_ID -b
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install iOS apps
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 18.1" -A 20 | grep "iPhone 16" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           if ls apps/ios/*.app 1> /dev/null 2>&1; then
             for app in apps/ios/*.app; do
               echo "Installing $(basename "$app")..."

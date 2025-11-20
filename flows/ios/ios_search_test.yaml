@@ -2,6 +2,7 @@ appId: com.example.apple-samplecode.UICatalog
 
 ---
 # Launch the application
+- clearState
 - launchApp
 
 # Wait for app to fully load
@@ -21,7 +22,9 @@ appId: com.example.apple-samplecode.UICatalog
     timeout: 5000
 
 # Tap on the search bar to focus it
-- tapOn: "Default Search Bar"
+- tapOn:
+    text: Search
+    index: 1
 
 # Enter text in search field
 - inputText: "First Search"

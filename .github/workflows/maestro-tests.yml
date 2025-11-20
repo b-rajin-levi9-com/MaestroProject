@@ -27,12 +27,12 @@ jobs:
 
       - name: Boot iOS Simulator
         run: |
-          # Boot iPhone 15 Pro with iOS 17.0
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          # Boot iPhone 16 with iOS 18.1
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 18.1" -A 20 | grep "iPhone 16 " | grep -v "Pro" | grep -v "Plus" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           echo "Booting simulator: $DEVICE_ID"
           xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
           
-          # Wait for simulator to be ready
+          # Wait for simulator to be ready  
           echo "Waiting for simulator to be ready..."
           xcrun simctl bootstatus $DEVICE_ID -b
           
