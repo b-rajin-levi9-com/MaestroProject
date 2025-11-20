@@ -1,0 +1,33 @@
+appId: com.example.apple-samplecode.UICatalog
+
+---
+# Pokreni aplikaciju
+- launchApp
+
+# Tap na "Buttons" sekciju
+- tapOn: "Stack Views"
+
+- tapOn:
+    text: "stepper increment" 
+    index: 1
+
+- tapOn:
+    text: "stepper decrement" 
+
+
+
+# Vracanje nazad (Back dugme)
+- tapOn:
+    text: "UIKitCatalog"
+    label: "Go back from Buttons screen"
+
+# Tap na "Alerts"
+- tapOn: "Alert Views"
+
+# Opcionalno: pokazi alert
+- tapOn: "Simple"
+
+# Zatvori alert
+- tapOn: "OK"
+
+- stopApp

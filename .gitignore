@@ -1,0 +1,37 @@
+# Maestro test reports
+reports/
+*.xml
+
+# Maestro debug logs
+.maestro/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.log
+
+# App files (usually too large for git)
+# OPTION 1: To commit app files to git, comment out these lines:
+# apps/ios/*.app
+# apps/android/*.apk
+
+# OPTION 2: Keep files excluded and use one of these alternatives:
+# - Store apps in GitHub Releases and download in workflow
+# - Build apps in CI pipeline
+# - Use Git LFS for large files
+# - Store in external artifact storage
+
+# For now, apps are INCLUDED in git (lines commented out)
+# Uncomment the lines above to exclude them
+
+# But keep the README files
+!apps/*/README.md
+

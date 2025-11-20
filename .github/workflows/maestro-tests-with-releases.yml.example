@@ -1,0 +1,195 @@
+# Example workflow that downloads apps from GitHub Releases
+# Use this if your app files are too large to commit to the repository
+# 
+# To use this workflow:
+# 1. Upload your apps to a GitHub Release
+# 2. Rename this file to remove .example extension
+# 3. Update the release tag and file names below
+# 4. Disable or remove maestro-tests.yml
+
+name: Maestro UI Tests (with Release Apps)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  ios-tests:
+    name: iOS Tests
+    runs-on: macos-14
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download iOS app from GitHub Release
+        run: |
+          # Download .app from GitHub Release
+          # Update the release tag and app name below
+          RELEASE_TAG="v1.0.0"  # Change to your release tag
+          APP_NAME="UICatalog.app"  # Change to your app name
+          
+          mkdir -p apps/ios
+          
+          # Download and extract the app
+          gh release download $RELEASE_TAG \
+            --pattern "${APP_NAME}.zip" \
+            --dir apps/ios
+          
+          # Unzip if the app was uploaded as a zip
+          cd apps/ios
+          if [ -f "${APP_NAME}.zip" ]; then
+            unzip "${APP_NAME}.zip"
+            rm "${APP_NAME}.zip"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: List available iOS simulators
+        run: xcrun simctl list devices available
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          echo "Booting simulator: $DEVICE_ID"
+          xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
+          xcrun simctl bootstatus $DEVICE_ID -b
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: Install iOS apps
+        run: |
+          if ls apps/ios/*.app 1> /dev/null 2>&1; then
+            for app in apps/ios/*.app; do
+              echo "Installing $(basename "$app")..."
+              xcrun simctl install $DEVICE_ID "$app"
+            done
+          else
+            echo "❌ No .app files found in apps/ios/"
+            echo "Make sure apps were downloaded from release"
+            exit 1
+          fi
+
+      - name: Run iOS tests
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
+          mkdir -p reports/ios
+          maestro test flows/ios/ \
+            --format=JUNIT \
+            --output=reports/ios/test-results.xml || true
+
+      - name: Upload iOS test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-reports
+          path: reports/ios/
+          retention-days: 30
+
+  android-tests:
+    name: Android Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Android app from GitHub Release
+        run: |
+          # Download .apk from GitHub Release
+          # Update the release tag and app name below
+          RELEASE_TAG="v1.0.0"  # Change to your release tag
+          APK_NAME="ApiDemos.apk"  # Change to your APK name
+          
+          mkdir -p apps/android
+          
+          # Download the APK
+          gh release download $RELEASE_TAG \
+            --pattern "${APK_NAME}" \
+            --dir apps/android
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-30
+
+      - name: Run Android tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            export PATH="$HOME/.maestro/bin:$PATH"
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            
+            if ls apps/android/*.apk 1> /dev/null 2>&1; then
+              for apk in apps/android/*.apk; do
+                echo "Installing $(basename "$apk")..."
+                adb install -r "$apk"
+              done
+            else
+              echo "❌ No .apk files found in apps/android/"
+              echo "Make sure apps were downloaded from release"
+              exit 1
+            fi
+            
+            mkdir -p reports/android
+            maestro test flows/android/ \
+              --format=JUNIT \
+              --output=reports/android/test-results.xml || true
+
+      - name: Upload Android test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-reports
+          path: reports/android/
+          retention-days: 30
+

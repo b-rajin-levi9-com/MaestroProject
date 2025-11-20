@@ -1,0 +1,7 @@
+appId: io.appium.android.apis
+
+---
+- launchApp
+- tapOn: "Graphics"
+- tapOn: "AlphaBitmap"
+- stopApp

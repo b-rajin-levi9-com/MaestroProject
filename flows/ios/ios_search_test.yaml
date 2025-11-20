@@ -1,0 +1,24 @@
+appId: com.example.apple-samplecode.UICatalog
+
+---
+# Launch the application
+- launchApp
+
+# Tap on "Search" section
+- tapOn: "Search"
+
+# Tap on "Default"
+- tapOn: "Default"
+
+# Tap on the search bar to focus it
+- tapOn: "Default Search Bar"
+
+# Enter text in search field
+- inputText: "First Search"
+
+# Assert that the text is visible in the search field
+- assertVisible:
+    text: "First Search"
+    label: "Verify that 'First Search' text is visible in the search field"
+
+- stopApp

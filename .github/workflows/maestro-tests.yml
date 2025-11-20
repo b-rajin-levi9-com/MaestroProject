@@ -1,0 +1,240 @@
+name: Maestro UI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  ios-tests:
+    name: iOS Tests
+    runs-on: macos-14  # Latest macOS with Apple Silicon support
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: List available iOS simulators
+        run: xcrun simctl list devices available
+
+      - name: Boot iOS Simulator
+        run: |
+          # Boot iPhone 16 Pro simulator (adjust device name as needed)
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          echo "Booting simulator: $DEVICE_ID"
+          xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
+          
+          # Wait for simulator to be ready
+          echo "Waiting for simulator to be ready..."
+          xcrun simctl bootstatus $DEVICE_ID -b
+          
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: Install iOS apps
+        run: |
+          # Install all .app files from apps/ios/ directory
+          if ls apps/ios/*.app 1> /dev/null 2>&1; then
+            for app in apps/ios/*.app; do
+              echo "Installing $(basename "$app")..."
+              xcrun simctl install $DEVICE_ID "$app"
+            done
+          else
+            echo "⚠️  No .app files found in apps/ios/"
+            echo "Please add your iOS app files to apps/ios/ directory"
+          fi
+
+      - name: Run iOS tests
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
+          
+          # Create reports directory
+          mkdir -p reports/ios
+          
+          # Run tests
+          maestro test flows/ios/ \
+            --format=JUNIT \
+            --output=reports/ios/test-results.xml || true
+
+      - name: Upload iOS test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-reports
+          path: reports/ios/
+          retention-days: 30
+
+      - name: Publish iOS test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: iOS Test Results
+          path: reports/ios/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+  android-tests:
+    name: Android Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable KVM (for Android Emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-30
+
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Run Android tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            export PATH="$HOME/.maestro/bin:$PATH"
+            
+            # Wait for emulator to be ready
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            
+            # Install all .apk files from apps/android/ directory
+            if ls apps/android/*.apk 1> /dev/null 2>&1; then
+              for apk in apps/android/*.apk; do
+                echo "Installing $(basename "$apk")..."
+                adb install -r "$apk"
+              done
+            else
+              echo "⚠️  No .apk files found in apps/android/"
+              echo "Please add your Android APK files to apps/android/ directory"
+            fi
+            
+            # Create reports directory
+            mkdir -p reports/android
+            
+            # Run tests
+            maestro test flows/android/ \
+              --format=JUNIT \
+              --output=reports/android/test-results.xml || true
+
+      - name: Upload Android test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-reports
+          path: reports/android/
+          retention-days: 30
+
+      - name: Publish Android test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Android Test Results
+          path: reports/android/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+  test-summary:
+    name: Test Summary
+    needs: [ios-tests, android-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download iOS test reports
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ios-test-reports
+          path: reports/ios/
+
+      - name: Download Android test reports
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: android-test-reports
+          path: reports/android/
+
+      - name: Generate test summary
+        run: |
+          echo "# 📊 Maestro Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # iOS Results
+          echo "## 🍎 iOS Tests" >> $GITHUB_STEP_SUMMARY
+          if [ -f "reports/ios/test-results.xml" ]; then
+            echo "✅ iOS test report generated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ No iOS test report found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Android Results
+          echo "## 🤖 Android Tests" >> $GITHUB_STEP_SUMMARY
+          if [ -f "reports/android/test-results.xml" ]; then
+            echo "✅ Android test report generated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ No Android test report found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "View detailed test results in the artifacts section above." >> $GITHUB_STEP_SUMMARY
+

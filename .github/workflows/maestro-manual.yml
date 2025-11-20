@@ -1,0 +1,152 @@
+name: Manual Maestro Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to test'
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
+          - both
+      test_file:
+        description: 'Specific test file to run (optional, leave empty to run all)'
+        required: false
+        type: string
+
+jobs:
+  ios-manual-test:
+    name: iOS Manual Test
+    if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
+    runs-on: macos-14
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          echo "Booting simulator: $DEVICE_ID"
+          xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
+          xcrun simctl bootstatus $DEVICE_ID -b
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Install iOS apps
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          if ls apps/ios/*.app 1> /dev/null 2>&1; then
+            for app in apps/ios/*.app; do
+              echo "Installing $(basename "$app")..."
+              xcrun simctl install $DEVICE_ID "$app"
+            done
+          else
+            echo "⚠️  No .app files found in apps/ios/"
+          fi
+
+      - name: Run iOS test
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000
+          mkdir -p reports/ios
+          
+          if [ -z "${{ github.event.inputs.test_file }}" ]; then
+            echo "Running all iOS tests..."
+            maestro test flows/ios/ --format=JUNIT --output=reports/ios/test-results.xml
+          else
+            echo "Running specific test: ${{ github.event.inputs.test_file }}"
+            maestro test flows/ios/${{ github.event.inputs.test_file }} --format=JUNIT --output=reports/ios/test-results.xml
+          fi
+
+      - name: Upload iOS test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-manual-test-reports
+          path: reports/ios/
+          retention-days: 7
+
+  android-manual-test:
+    name: Android Manual Test
+    if: ${{ github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-30
+
+      - name: Run Android test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            export PATH="$HOME/.maestro/bin:$PATH"
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            
+            # Install all .apk files from apps/android/ directory
+            if ls apps/android/*.apk 1> /dev/null 2>&1; then
+              for apk in apps/android/*.apk; do
+                echo "Installing $(basename "$apk")..."
+                adb install -r "$apk"
+              done
+            else
+              echo "⚠️  No .apk files found in apps/android/"
+            fi
+            
+            mkdir -p reports/android
+            
+            if [ -z "${{ github.event.inputs.test_file }}" ]; then
+              echo "Running all Android tests..."
+              maestro test flows/android/ --format=JUNIT --output=reports/android/test-results.xml
+            else
+              echo "Running specific test: ${{ github.event.inputs.test_file }}"
+              maestro test flows/android/${{ github.event.inputs.test_file }} --format=JUNIT --output=reports/android/test-results.xml
+            fi
+
+      - name: Upload Android test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-manual-test-reports
+          path: reports/android/
+          retention-days: 7
+
