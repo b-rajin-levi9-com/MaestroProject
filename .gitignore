@@ -1,6 +1,7 @@
 # Maestro test reports
 reports/
 *.xml
+report.html
 
 # Maestro debug logs
 .maestro/
