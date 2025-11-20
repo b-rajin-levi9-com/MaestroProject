@@ -1,0 +1,58 @@
+appId: com.example.apple-samplecode.UICatalog
+
+---
+# Launch the application
+- clearState
+- launchApp
+
+# Wait for app to fully load
+- extendedWaitUntil:
+    visible: "Text Fields"
+    timeout: 10000
+
+# Navigate to Text Fields section
+- tapOn: "Text Fields"
+
+# Wait for Text Fields screen to load
+- extendedWaitUntil:
+    visible: "DEFAULT"
+    timeout: 5000
+
+# Tap on the first text field (DEFAULT section)
+- tapOn: "Placeholder text"
+
+# Input text in first field
+- inputText: "First text"
+
+# Verify first text is visible
+- assertVisible:
+    text: "First text"
+    label: "Verify that 'First text' is visible in the first input field"
+
+# Dismiss keyboard
+- tapOn: "done"
+
+# Wait for keyboard to dismiss
+- extendedWaitUntil:
+    visible: "TINTED"
+    timeout: 3000
+
+# Tap on the second text field (TINTED section)
+- tapOn:
+    text: "Placeholder text"
+    index: 1
+
+# Input text in second field
+- inputText: "Second text"
+
+# Verify second text is visible
+- assertVisible:
+    text: "Second text"
+    label: "Verify that 'Second text' is visible in the second input field"
+
+# Dismiss keyboard
+- tapOn: "done"
+
+# Close the app
+- stopApp
+

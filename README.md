@@ -12,10 +12,11 @@ This repository contains automated UI tests for iOS and Android applications usi
 maestro/
 ├── flows/
 │   ├── ios/              # iOS test flows
-│   │   ├── first_flow_apple.yaml
-│   │   └── ios_search_test.yaml
+│   │   ├── ios_first_flow.yaml
+│   │   ├── ios_search_test.yaml
+│   │   └── ios_text_fields_test.yaml
 │   └── android/          # Android test flows
-│       └── first_flow_android.yaml
+│       └── android_first_flow.yaml
 ├── apps/
 │   ├── ios/              # iOS .app files (place your apps here)
 │   └── android/          # Android .apk files (place your APKs here)
@@ -82,12 +83,13 @@ maestro test flows/android/first_flow_android.yaml --format=JUNIT --output=repor
 
 ### iOS Tests
 
-- **first_flow_apple.yaml**: Tests UICatalog app navigation through Stack Views, Steppers, and Alert Views
+- **ios_first_flow.yaml**: Tests UICatalog app navigation through Stack Views, Steppers, and Alert Views
 - **ios_search_test.yaml**: Tests search functionality - navigates to Search > Default, enters "First Search" and validates the text
+- **ios_text_fields_test.yaml**: Tests text input functionality - navigates to Text Fields, enters "First text" in the first field, "Second text" in the second field, and validates both are displayed correctly
 
 ### Android Tests
 
-- **first_flow_android.yaml**: Tests API Demos app - navigates to Graphics > AlphaBitmap
+- **android_first_flow.yaml**: Tests API Demos app - navigates to Graphics > AlphaBitmap
 
 ## Troubleshooting
 
