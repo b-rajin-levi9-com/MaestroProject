@@ -27,8 +27,8 @@ jobs:
 
       - name: Boot iOS Simulator
         run: |
-          # Boot iPhone 16 Pro simulator (adjust device name as needed)
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          # Boot iPhone 15 Pro with iOS 17.0
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           echo "Booting simulator: $DEVICE_ID"
           xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
           
@@ -157,28 +157,13 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            set -e
+            set -eo pipefail
             export PATH="$HOME/.maestro/bin:$PATH"
-            
-            # Wait for emulator to be ready
             adb wait-for-device
             adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
-            
-            # Install all .apk files from apps/android/ directory
-            if ls apps/android/*.apk >/dev/null 2>&1; then
-              for apk in apps/android/*.apk; do
-                echo "Installing $(basename "$apk")..."
-                adb install -r "$apk"
-              done
-            else
-              echo "⚠️  No .apk files found in apps/android/"
-              echo "Please add your Android APK files to apps/android/ directory"
-            fi
-            
-            # Create reports directory
+            echo "Installing APK files..."
+            find apps/android -name "*.apk" -type f -exec adb install -r {} \;
             mkdir -p reports/android
-            
-            # Run tests (don't fail on test failures)
             maestro test flows/android/ --format=JUNIT --output=reports/android/test-results.xml || true
 
       - name: Upload Android test reports

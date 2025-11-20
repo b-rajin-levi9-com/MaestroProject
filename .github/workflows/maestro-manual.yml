@@ -29,7 +29,7 @@ jobs:
 
       - name: Boot iOS Simulator
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           echo "Booting simulator: $DEVICE_ID"
           xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
           xcrun simctl bootstatus $DEVICE_ID -b
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install iOS apps
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iOS 17.0" -A 20 | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           if ls apps/ios/*.app 1> /dev/null 2>&1; then
             for app in apps/ios/*.app; do
               echo "Installing $(basename "$app")..."
@@ -118,23 +118,13 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -e
+            set -eo pipefail
             export PATH="$HOME/.maestro/bin:$PATH"
             adb wait-for-device
             adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
-            
-            # Install all .apk files from apps/android/ directory
-            if ls apps/android/*.apk >/dev/null 2>&1; then
-              for apk in apps/android/*.apk; do
-                echo "Installing $(basename "$apk")..."
-                adb install -r "$apk"
-              done
-            else
-              echo "⚠️  No .apk files found in apps/android/"
-            fi
-            
+            echo "Installing APK files..."
+            find apps/android -name "*.apk" -type f -exec adb install -r {} \;
             mkdir -p reports/android
-            
             if [ -z "${{ github.event.inputs.test_file }}" ]; then
               echo "Running all Android tests..."
               maestro test flows/android/ --format=JUNIT --output=reports/android/test-results.xml
