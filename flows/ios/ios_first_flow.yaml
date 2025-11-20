@@ -4,6 +4,11 @@ appId: com.example.apple-samplecode.UICatalog
 # Pokreni aplikaciju
 - launchApp
 
+# Wait for app to fully load
+- extendedWaitUntil:
+    visible: "Stack Views"
+    timeout: 10000
+
 # Tap na "Buttons" sekciju
 - tapOn: "Stack Views"
 

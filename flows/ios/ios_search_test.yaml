@@ -4,11 +4,21 @@ appId: com.example.apple-samplecode.UICatalog
 # Launch the application
 - launchApp
 
+# Wait for app to fully load
+- extendedWaitUntil:
+    visible: "Search"
+    timeout: 10000
+
 # Tap on "Search" section
 - tapOn: "Search"
 
 # Tap on "Default"
 - tapOn: "Default"
+
+# Wait for search screen to load
+- extendedWaitUntil:
+    visible: "Default Search Bar"
+    timeout: 5000
 
 # Tap on the search bar to focus it
 - tapOn: "Default Search Bar"

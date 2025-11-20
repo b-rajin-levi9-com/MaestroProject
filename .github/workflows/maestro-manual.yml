@@ -118,12 +118,13 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
+            set -e
             export PATH="$HOME/.maestro/bin:$PATH"
             adb wait-for-device
-            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
             
             # Install all .apk files from apps/android/ directory
-            if ls apps/android/*.apk 1> /dev/null 2>&1; then
+            if ls apps/android/*.apk >/dev/null 2>&1; then
               for apk in apps/android/*.apk; do
                 echo "Installing $(basename "$apk")..."
                 adb install -r "$apk"

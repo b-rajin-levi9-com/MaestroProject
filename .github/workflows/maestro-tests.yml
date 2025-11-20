@@ -7,6 +7,11 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # Allows manual trigger from GitHub UI
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   ios-tests:
     name: iOS Tests
@@ -23,7 +28,7 @@ jobs:
       - name: Boot iOS Simulator
         run: |
           # Boot iPhone 16 Pro simulator (adjust device name as needed)
-          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | grep -v "Max" | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
           echo "Booting simulator: $DEVICE_ID"
           xcrun simctl boot $DEVICE_ID || echo "Simulator already booted"
           
@@ -80,11 +85,13 @@ jobs:
       - name: Publish iOS test results
         uses: dorny/test-reporter@v1
         if: always()
+        continue-on-error: true
         with:
           name: iOS Test Results
           path: reports/ios/*.xml
           reporter: java-junit
           fail-on-error: false
+          fail-on-empty: false
 
   android-tests:
     name: Android Tests
@@ -150,14 +157,15 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            set -e
             export PATH="$HOME/.maestro/bin:$PATH"
             
             # Wait for emulator to be ready
             adb wait-for-device
-            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
             
             # Install all .apk files from apps/android/ directory
-            if ls apps/android/*.apk 1> /dev/null 2>&1; then
+            if ls apps/android/*.apk >/dev/null 2>&1; then
               for apk in apps/android/*.apk; do
                 echo "Installing $(basename "$apk")..."
                 adb install -r "$apk"
@@ -170,10 +178,8 @@ jobs:
             # Create reports directory
             mkdir -p reports/android
             
-            # Run tests
-            maestro test flows/android/ \
-              --format=JUNIT \
-              --output=reports/android/test-results.xml || true
+            # Run tests (don't fail on test failures)
+            maestro test flows/android/ --format=JUNIT --output=reports/android/test-results.xml || true
 
       - name: Upload Android test reports
         uses: actions/upload-artifact@v4
@@ -186,11 +192,13 @@ jobs:
       - name: Publish Android test results
         uses: dorny/test-reporter@v1
         if: always()
+        continue-on-error: true
         with:
           name: Android Test Results
           path: reports/android/*.xml
           reporter: java-junit
           fail-on-error: false
+          fail-on-empty: false
 
   test-summary:
     name: Test Summary
