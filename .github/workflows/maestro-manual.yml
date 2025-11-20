@@ -118,7 +118,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -eo pipefail
+            set -e
             export PATH="$HOME/.maestro/bin:$PATH"
             adb wait-for-device
             adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
