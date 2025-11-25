@@ -1,0 +1,39 @@
+appId: any
+---
+- runScript: ../../config/appIds.js
+- clearState: ${output.appIdUnderTest}
+- launchApp: ${output.appIdUnderTest}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: Views
+      - scrollUntilVisible:
+          element:
+            text: TextFields
+      - tapOn: TextFields
+      - tapOn:
+         id: edit1
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Text Fields"
+      - tapOn:
+         text: Placeholder text
+         index: 1
+- inputText: "Second text"
+- assertVisible:
+    text: "Second text"
+    label: "Verify that 'Second text' is visible in the second input field"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "Back"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "done"
+- stopApp: ${output.appIdUnderTest}
